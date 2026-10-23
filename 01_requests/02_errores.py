@@ -1,6 +1,6 @@
 import requests
 
-BASE = "https://jsonplaceholder.typicode.co"
+BASE = "https://jsonplaceholder.typicode.com"
 
 
 def obtener_usuario(user_id):
