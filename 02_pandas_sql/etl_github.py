@@ -73,7 +73,13 @@ def extraer(org,max_paginas=None, por_pagina=100, max_reintentos=3):
 def transformar(datos):
     """Convierte el JSON crudo en un DataFrame limpio."""
     df = pd.DataFrame(datos)[COLUMNAS]
-    df["created_at"] = pd.to_datetime(df["created_at"])
+    
+    df["created_at"] = (
+        pd.to_datetime(df["created_at"],utc=True)
+        .dt.tz_convert("America/Argentina/Buenos_Aires")
+        .dt.tz_localize(None)
+    )
+
     df["anio"] = df["created_at"].dt.year
     df["language"] = df["language"].fillna("Sin lenguaje")
     log.info("Transformados %d registros", len(df))
@@ -86,11 +92,11 @@ def cargar(df, ruta_db, tabla):
         df.to_sql(tabla, conn, if_exists="replace", index=False)
     log.info("Cargados %d registros en %s.%s", len(df), ruta_db, tabla)
 
-def consultar(ruta_db, sql, params=None):
+def consultar(ruta_db, sql, params=None, parse_dates=None):
     """Ejecuta una consulta SQL y devuelve un DataFrame."""
     with sqlite3.connect(ruta_db) as conn:
-        return pd.read_sql_query(sql, conn, params=params)
-    
+        return pd.read_sql_query(sql, conn, parse_dates=parse_dates, params=params)
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     datos = extraer("odoo")
