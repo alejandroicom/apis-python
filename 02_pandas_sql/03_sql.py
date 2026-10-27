@@ -1,34 +1,21 @@
-import sqlite3
-import os
+from etl_github import extraer, transformar, cargar, consultar
 
-import pandas as pd
-import requests
-from dotenv import load_dotenv
+import logging
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(message)s")
 
-load_dotenv()
+    
+datos = extraer("microsoft", 
+                max_paginas=3, 
+                por_pagina=100)
 
-r = requests.get(
-    "https://api.github.com/orgs/odoo/repos",
-    params={"per_page": 100},
-    headers={"Authorization": f"Bearer {os.getenv('GITHUB_TOKEN')}"},
-    timeout=10,
-)
-r.raise_for_status()
-
-df = pd.DataFrame(r.json())
-
-print("Filas y columnas:", df.shape)
 print()
 
-df = df[["name", "language", "stargazers_count", "forks_count", "created_at", "archived"]]
-df["created_at"] = pd.to_datetime(df["created_at"])
-df["anio"] = df["created_at"].dt.year
-df["language"] = df["language"].fillna("Sin lenguaje")
+df = transformar(datos)
 
-conn = sqlite3.connect("github.db")
+print()
 
-df.to_sql("repos", conn, if_exists="replace", index=False)
-print("Guardados", len(df), "repos en la tabla 'repos'")
+cargar(df, "github.db", "repos")
+
 print()
 
 consulta = """
@@ -41,15 +28,11 @@ consulta = """
     HAVING COUNT(*) >= 2
     ORDER BY repos DESC
 """
-print(pd.read_sql(consulta, conn))
+print(consultar("github.db", consulta))
 print()
 
 anio_minimo = 2020
-recientes = pd.read_sql(
-    "SELECT name, anio, stargazers_count FROM repos WHERE anio >= ? ORDER BY anio",
-    conn,
-    params=(anio_minimo,),
-)
+recientes = consultar("github.db", "SELECT name, anio, stargazers_count FROM repos WHERE anio >= ? ORDER BY anio", params=(anio_minimo,))
 print(recientes)
 
 consulta = """
@@ -60,7 +43,7 @@ consulta = """
     LIMIT 3
 
 """
-print(pd.read_sql(consulta, conn))
+print(consultar("github.db", consulta))
 print()
 
 
@@ -85,4 +68,3 @@ creados = (
 print()
 print(creados)
 
-conn.close()
